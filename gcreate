@@ -1,0 +1,138 @@
+#!/bin/bash
+
+#############################################
+#	AUTHOR 	   : SACHIN		    #
+#	MAIL	   : sachinsacc@live.in	    #
+#	CREATED ON : 2014 July 25	    #
+#	PLACE	   : Cubet Technolabs	    #
+#############################################
+
+
+FILE="/home/$USER/temp.txt"
+LOGIN="http://192.168.1.96/api/v3/session"
+CREATEREPO="http://192.168.1.96/api/v3/projects"
+JQ=`which jq`
+GIT=`which git`
+CURL=`which curl`
+
+clear
+
+#Checking commands
+
+	if [ ! -e "$GIT" ]; then
+                echo -e "'git' does not exist.Use 'sudo apt-get install git' to install.\n"
+		exit
+        fi
+	if [ ! -e "$CURL" ]; then
+		echo -e "'curl' does not exist.Use 'sudo apt-get install curl' to install.\n"
+		exit
+	fi
+	if [ ! -e "$JQ" ]; then
+		echo -e "'jq' does not exist.Use 'sudo apt-get install jq' to install.\n"
+		exit
+        fi
+
+#Entering credentials
+
+echo -en "\nEnter email id for GITLAB  : "
+read USER
+stty -echo
+echo -n "Enter your GITLAB Password : "
+read PASSWORD
+stty echo
+echo -en "\nEnter Repository Name (Do not use '.') : "
+read REPO
+
+# Checking input
+
+echo "$REPO" | grep -q "\."
+
+        if [ $? -eq 0 ]; then
+                echo -e "Repository name contains '.'\n"
+                exit;
+        fi
+
+	if [ "$REPO" = "" ]
+	then
+    		echo "ERROR : Please provide repository name."
+		#zenity --error --text="Please provide repository name." 2>/dev/null
+    		exit 1;
+	else
+		 echo "$RERO"
+	fi
+
+
+#Logging in to GITLAB to get private token
+
+$CURL 2>/dev/null -d "email=$USER&password=$PASSWORD" "$LOGIN" | $JQ '.private_token' > $FILE
+TOKEN=$(tr -d '"' < $FILE)
+
+	if [ "$TOKEN" = "null" ]; then
+		echo -e "\nERROR : Invalied Username or Password.\n"
+	#	zenity --error --text="Invalied Username or Password." 2>/dev/null	
+		exit; 
+	else
+		echo -e "\nLogin success."
+	fi
+
+#Checking project name and Creating project
+
+$CURL -s -o $FILE --header "PRIVATE-TOKEN: $TOKEN" --data "name=$REPO&public=false" "$CREATEREPO" 2>/dev/null
+
+cat $FILE | grep 404 >/dev/null
+	if [ $? -eq 0 ]
+	then
+		echo -e "\nEROR : Repository name already exists."
+		#zenity --error --text="Repository name already exists." 2>/dev/null
+		exit;
+	else
+		echo -e "Project created successfully.\n"
+	fi
+
+URL=$(cat $FILE | $JQ '.ssh_url_to_repo' | tr -d '"')
+PROJECTID=$(cat $FILE | $JQ '.id' | tr -d '"')
+
+#Checking empty directory for initial commit
+
+ERR="y"
+	while [ "$ERR" = "y" ]
+	do
+		echo -n "Enter empty directory path : "
+		read DIR
+		#zenity --info --title="info" --text="Please select an empty directory for new repository" 2>/dev/null
+                #DIR=$(zenity --file-selection --directory 2>/dev/null)
+			if [ "$(ls -A $DIR)" ]; then
+        			echo -e "ERROR : $DIR is not Empty....!\n"
+        			#zenity --error --text="Directory is not empty." 2>/dev/null
+				ERR="y"
+			else
+				ERR="n"
+			fi
+ 	 done
+
+#Creating git foder and pushing README.md in repository
+
+cd $DIR
+git init
+touch README.md
+git add README.md
+git commit -m 'Initial commit' >/dev/null
+git remote add origin $URL
+git push origin master 2>/dev/null
+
+echo -e "\nMaster branch created."
+echo -e "Empty README.md pushed to master branch."
+
+#Creating Branches
+
+CREATEBRANCH="http://192.168.1.96/api/v3/projects/$PROJECTID/repository/branches"
+
+curl -s -o $FILE --header "PRIVATE-TOKEN: $TOKEN" --data "id=$PROJECTID&branch_name=CODE&ref=master" "$CREATEBRANCH" 2>/dev/null
+echo -e "Branch \"CODE\" created."
+curl -s -o $FILE --header "PRIVATE-TOKEN: $TOKEN" --data "id=$PROJECTID&branch_name=TESTING&ref=master" "$CREATEBRANCH" 2>/dev/null
+echo -e "Branch \"DESIGN\" created"
+curl -s -o $FILE --header "PRIVATE-TOKEN: $TOKEN" --data "id=$PROJECTID&branch_name=DESIGN&ref=master" "$CREATEBRANCH" 2>/dev/null
+echo -e "Branch \"TESTING\" created\n"
+
+rm -rf $FILE
+
