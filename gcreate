@@ -7,15 +7,16 @@
 #	PLACE	   : Cubet Technolabs	    #
 #############################################
 
-
-FILE="/home/$USER/temp.txt"
-LOGIN="http://192.168.1.96/api/v3/session"
-CREATEREPO="http://192.168.1.96/api/v3/projects"
 JQ=`which jq`
 GIT=`which git`
 CURL=`which curl`
+FILE="/home/$USER/temp.txt"
+LOGIN="http://192.168.1.96/api/v3/session"
+CREATEREPO="http://192.168.1.96/api/v3/projects"
+
 
 clear
+
 
 #Checking commands
 
@@ -32,23 +33,30 @@ clear
 		exit
         fi
 
+
+
+
 #Entering credentials
 
-echo -en "\nEnter email id for GITLAB  : "
+echo -en "\nEnter Email ID for GITLAB  : "
 read USER
 stty -echo
 echo -n "Enter your GITLAB Password : "
 read PASSWORD
 stty echo
-echo -en "\nEnter Repository Name (Do not use '.') : "
+echo -en "\nEnter Repository Name [Do not use '.'] : "
 read REPO
+
+
+
+
 
 # Checking input
 
 echo "$REPO" | grep -q "\."
 
         if [ $? -eq 0 ]; then
-                echo -e "Repository name contains '.'\n"
+                echo -e "\nERROR : Repository name contains '.'"
                 exit;
         fi
 
@@ -56,10 +64,44 @@ echo "$REPO" | grep -q "\."
 	then
     		echo "ERROR : Please provide repository name."
 		#zenity --error --text="Please provide repository name." 2>/dev/null
-    		exit 1;
+    		exit;
 	else
 		 echo "$RERO"
 	fi
+
+
+
+
+
+#Check cloning directory
+
+ERR="y"
+	while [ "$ERR" = "y" ]
+	do
+		echo -n "Enter an empty directory path to clone repository :"
+		read DIR
+		#zenity --info --title="info" --text="Please select an empty directory for new repository" 2>/dev/null
+                #DIR=$(zenity --file-selection --directory 2>/dev/null)
+			if ! [ -d $DIR ]; then
+				if ! mkdir $DIR 2>/dev/null
+				then
+				echo -e "\nERROR : Unable to create '$DIR' : Permission denied."
+				exit;
+				else
+    				echo -e "\n$DIR created."
+				fi
+			fi
+			if [ "$(ls -A $DIR)" ]; then
+        			echo -e "ERROR : $DIR is not Empty....!\n"
+        			#zenity --error --text="Directory is not empty." 2>/dev/null
+				ERR="y"
+			else
+				ERR="n"
+			fi
+ 	 done
+
+
+
 
 
 #Logging in to GITLAB to get private token
@@ -72,8 +114,12 @@ TOKEN=$(tr -d '"' < $FILE)
 	#	zenity --error --text="Invalied Username or Password." 2>/dev/null	
 		exit; 
 	else
-		echo -e "\nLogin success."
+		echo "GITLAB Login success."
 	fi
+
+
+
+
 
 #Checking project name and Creating project
 
@@ -86,53 +132,53 @@ cat $FILE | grep 404 >/dev/null
 		#zenity --error --text="Repository name already exists." 2>/dev/null
 		exit;
 	else
-		echo -e "Project created successfully.\n"
+		echo -e "Repository '$REPO' created"
 	fi
 
 URL=$(cat $FILE | $JQ '.ssh_url_to_repo' | tr -d '"')
 PROJECTID=$(cat $FILE | $JQ '.id' | tr -d '"')
 
-#Checking empty directory for initial commit
 
-ERR="y"
-	while [ "$ERR" = "y" ]
-	do
-		echo -n "Enter empty directory path : "
-		read DIR
-		#zenity --info --title="info" --text="Please select an empty directory for new repository" 2>/dev/null
-                #DIR=$(zenity --file-selection --directory 2>/dev/null)
-			if [ "$(ls -A $DIR)" ]; then
-        			echo -e "ERROR : $DIR is not Empty....!\n"
-        			#zenity --error --text="Directory is not empty." 2>/dev/null
-				ERR="y"
-			else
-				ERR="n"
-			fi
- 	 done
 
-#Creating git foder and pushing README.md in repository
+
+
+#Creating and pushing README.md into repository
 
 cd $DIR
-git init
+		if ! git init 2>/dev/null
+		then
+		echo -e "\nERROR:Unable to create '.git' at $DIR : Permission denied"
+		exit;
+		fi
 touch README.md
+echo -en "\nWould you like to add Project details in README.md (y/n) : "
+read README
+		if [ "$README" = "y" ]
+		then
+		nano README.md
+		else
+		echo -e "\nNo content added to README.md"
+		fi
 git add README.md
 git commit -m 'Initial commit' >/dev/null
 git remote add origin $URL
 git push origin master 2>/dev/null
 
-echo -e "\nMaster branch created."
-echo -e "Empty README.md pushed to master branch."
+echo "Master branch created"
+
+
+
 
 #Creating Branches
 
-CREATEBRANCH="http://192.168.1.96/api/v3/projects/$PROJECTID/repository/branches"
+CREATEBRANCH="$CREATEREPO/$PROJECTID/repository/branches"
 
-curl -s -o $FILE --header "PRIVATE-TOKEN: $TOKEN" --data "id=$PROJECTID&branch_name=CODE&ref=master" "$CREATEBRANCH" 2>/dev/null
-echo -e "Branch \"CODE\" created."
-curl -s -o $FILE --header "PRIVATE-TOKEN: $TOKEN" --data "id=$PROJECTID&branch_name=TESTING&ref=master" "$CREATEBRANCH" 2>/dev/null
-echo -e "Branch \"DESIGN\" created"
-curl -s -o $FILE --header "PRIVATE-TOKEN: $TOKEN" --data "id=$PROJECTID&branch_name=DESIGN&ref=master" "$CREATEBRANCH" 2>/dev/null
-echo -e "Branch \"TESTING\" created\n"
+curl -s -o $FILE --header "PRIVATE-TOKEN: $TOKEN" --data "id=$PROJECTID&branch_name=code&ref=master" "$CREATEBRANCH" 2>/dev/null
+echo -e "Branch 'code' created"
+curl -s -o $FILE --header "PRIVATE-TOKEN: $TOKEN" --data "id=$PROJECTID&branch_name=design&ref=master" "$CREATEBRANCH" 2>/dev/null
+echo -e "Branch 'design' created"
+curl -s -o $FILE --header "PRIVATE-TOKEN: $TOKEN" --data "id=$PROJECTID&branch_name=testing&ref=master" "$CREATEBRANCH" 2>/dev/null
+echo -e "Branch 'testing' created\n"
 
 rm -rf $FILE
 
