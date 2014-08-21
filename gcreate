@@ -7,6 +7,7 @@
 #	PLACE	   : Cubet Technolabs	    #
 #############################################
 
+
 JQ=`which jq`
 GIT=`which git`
 CURL=`which curl`
@@ -21,18 +22,17 @@ clear
 #Checking commands
 
 	if [ ! -e "$GIT" ]; then
-                echo -e "'git' does not exist.Use 'sudo apt-get install git' to install.\n"
+                echo -e "'git' command does not exist.Use 'sudo apt-get install git' to install.\n"
 		exit
         fi
 	if [ ! -e "$CURL" ]; then
-		echo -e "'curl' does not exist.Use 'sudo apt-get install curl' to install.\n"
+		echo -e "'curl' command  does not exist.Use 'sudo apt-get install curl' to install.\n"
 		exit
 	fi
 	if [ ! -e "$JQ" ]; then
-		echo -e "'jq' does not exist.Use 'sudo apt-get install jq' to install.\n"
+		echo -e "'jq' command does not exist.Use 'sudo apt-get install jq' to install.\n"
 		exit
         fi
-
 
 
 
@@ -48,9 +48,6 @@ echo -en "\nEnter Repository Name [Do not use '.'] : "
 read REPO
 
 
-
-
-
 # Checking input
 
 echo "$REPO" | grep -q "\."
@@ -63,14 +60,10 @@ echo "$REPO" | grep -q "\."
 	if [ "$REPO" = "" ]
 	then
     		echo "ERROR : Please provide repository name."
-		#zenity --error --text="Please provide repository name." 2>/dev/null
-    		exit;
+		exit;
 	else
 		 echo "$RERO"
 	fi
-
-
-
 
 
 #Check cloning directory
@@ -78,29 +71,24 @@ echo "$REPO" | grep -q "\."
 ERR="y"
 	while [ "$ERR" = "y" ]
 	do
-		echo -n "Enter an empty directory path to clone repository :"
+		echo -n "Provide an empty directory path to clone repository :"
 		read DIR
-		#zenity --info --title="info" --text="Please select an empty directory for new repository" 2>/dev/null
-                #DIR=$(zenity --file-selection --directory 2>/dev/null)
-			if ! [ -d $DIR ]; then
+				if ! [ -d $DIR ]; then
 				if ! mkdir $DIR 2>/dev/null
 				then
 				echo -e "\nERROR : Unable to create '$DIR' : Permission denied."
 				exit;
 				else
-    				echo -e "\n$DIR created."
+    				echo -e "$DIR created."
 				fi
 			fi
 			if [ "$(ls -A $DIR)" ]; then
         			echo -e "ERROR : $DIR is not Empty....!\n"
-        			#zenity --error --text="Directory is not empty." 2>/dev/null
-				ERR="y"
+        			ERR="y"
 			else
 				ERR="n"
 			fi
  	 done
-
-
 
 
 
@@ -111,13 +99,10 @@ TOKEN=$(tr -d '"' < $FILE)
 
 	if [ "$TOKEN" = "null" ]; then
 		echo -e "\nERROR : Invalied Username or Password.\n"
-	#	zenity --error --text="Invalied Username or Password." 2>/dev/null	
 		exit; 
 	else
 		echo "GITLAB Login success."
 	fi
-
-
 
 
 
@@ -129,10 +114,9 @@ cat $FILE | grep 404 >/dev/null
 	if [ $? -eq 0 ]
 	then
 		echo -e "\nEROR : Repository name already exists."
-		#zenity --error --text="Repository name already exists." 2>/dev/null
 		exit;
 	else
-		echo -e "Repository '$REPO' created"
+		echo "Repository '$REPO' created"
 	fi
 
 URL=$(cat $FILE | $JQ '.ssh_url_to_repo' | tr -d '"')
@@ -140,12 +124,10 @@ PROJECTID=$(cat $FILE | $JQ '.id' | tr -d '"')
 
 
 
-
-
 #Creating and pushing README.md into repository
 
 cd $DIR
-		if ! git init 2>/dev/null
+		if ! git init >/dev/null
 		then
 		echo -e "\nERROR:Unable to create '.git' at $DIR : Permission denied"
 		exit;
@@ -157,16 +139,15 @@ read README
 		then
 		nano README.md
 		else
-		echo -e "\nNo content added to README.md"
+		echo -e "No content added to README.md\n"
 		fi
+echo "Creating branches..."
 git add README.md
 git commit -m 'Initial commit' >/dev/null
 git remote add origin $URL
 git push origin master 2>/dev/null
 
 echo "Master branch created"
-
-
 
 
 #Creating Branches
@@ -178,7 +159,51 @@ echo -e "Branch 'code' created"
 curl -s -o $FILE --header "PRIVATE-TOKEN: $TOKEN" --data "id=$PROJECTID&branch_name=design&ref=master" "$CREATEBRANCH" 2>/dev/null
 echo -e "Branch 'design' created"
 curl -s -o $FILE --header "PRIVATE-TOKEN: $TOKEN" --data "id=$PROJECTID&branch_name=testing&ref=master" "$CREATEBRANCH" 2>/dev/null
-echo -e "Branch 'testing' created\n"
+echo -e "Branch 'testing' created"
 
+#Pulling the branches
+echo "Pulling the branches..."
+git pull 2>/dev/null
+
+
+#checkout the branch
+
+check_branch(){
+ERROR="y"
+while [ "$ERROR" = "y" ]
+do
+echo -en "Enter the branch name (code/design/testing) : "
+read BRANCHNAME
+		if [ "$BRANCHNAME" = "code" ]; then
+		git checkout code
+		ERROR="n"
+		elif [ "$BRANCHNAME" = "design" ]; then
+		git checkout design
+		ERROR="n"
+		elif [ "$BRANCHNAME" = "testing" ]; then
+		git checkout testing
+		ERROR="n"
+		else
+		echo "ERROR: No such branch, enter a valid branch name."
+		ERROR="y"
+		fi
+done
+
+}
+ 
+echo -en "\nWould you like to change the branch now (y/n)? : "
+read BRANCH
+		if [ "$BRANCH" = "y" ]
+		then
+		check_branch
+		echo ""
+		else
+		echo -e "Project layout created successfully.\n"
+		exit;
+		fi
+
+
+#removing temporary file
 rm -rf $FILE
+
 
