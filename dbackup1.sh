@@ -21,6 +21,7 @@ MYSQLDUMP=/usr/bin/mysqldump
 LOG_FILE=$BASE_DIR/backup.log
 LOG_TIME=$(date +"%d-%m-%Y_%H.%M.%S")
 DOW=$(date +"%u")
+WOY=$(date +"%V")
 TAR="/bin/tar"
 
 
